@@ -1,6 +1,7 @@
-name: location-service
+name: location
 services:
-  - name: web
+  - name: tracker
+    web: true
     dockerfile_path: ./Dockerfile
     instance_count: 1
     instance_size_slug: basic-xxs
