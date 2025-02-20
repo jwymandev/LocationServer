@@ -1,12 +1,16 @@
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+spec_version: 1
 services:
   - name: tracker
-    web: true
-    dockerfile_path: ./Dockerfile
     instance_count: 1
     instance_size_slug: basic-xxs
+    git:
+      branch: main
+      repo_clone_url: ${GIT_REPO_URL}
+    dockerfile_path: ./Dockerfile
     http_port: 8080
-    routes:
-      - path: "/"
     envs:
       - key: DB_HOST
         value: ${DB_HOST}
