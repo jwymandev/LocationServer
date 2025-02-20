@@ -1,4 +1,3 @@
-name: location
 services:
   - name: tracker
     web: true
