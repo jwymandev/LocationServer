@@ -1,0 +1,13 @@
+packages:
+  - name: location
+    functions:
+      - name: tracker
+        main: main.py
+        runtime: python:3.9
+        web: true
+        environment:
+          DB_HOST: ${DB_HOST}
+          DB_NAME: ${DB_NAME}
+          DB_USER: ${DB_USER}
+          DB_PASSWORD: ${DB_PASSWORD}
+          ENCRYPTION_KEY: ${ENCRYPTION_KEY}
