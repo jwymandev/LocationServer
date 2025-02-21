@@ -9,9 +9,8 @@ packages:
   - name: tracker
     functions:
       - name: web
-        main: ""          # You can leave this empty if not needed
-        runtime: "docker"
-        dockerfile: "./Dockerfile"
+        main: "app:app"  # For example, if using uvicorn to run FastAPI app in app.py
+        runtime: "python:3.10"
         web: true
         http_port: 8080
         routes:
