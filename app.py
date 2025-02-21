@@ -34,8 +34,8 @@ app = FastAPI()
 
 # API Key verification dependency
 def verify_api_key(api_key: str = Header(...)):
-    ##if api_key != API_KEY:
-      ##  raise HTTPException(status_code=403, detail="Unauthorized API access")
+    if api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Unauthorized API access")
     return api_key
 
 # Visibility Enum and Models
@@ -96,8 +96,9 @@ def decrypt_location(encrypted_data: str) -> tuple:
 
 # Database connection functions
 async def get_db_connection():
-    ssl_context=ssl.create_default_context()
-    print("DB_CONFIG:", DB_CONFIG)
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
     return await asyncpg.connect(**DB_CONFIG, ssl=ssl_context)
 
 async def init_db():
@@ -172,3 +173,7 @@ async def find_nearest_users(request: NearestUsersRequest, api_key: str = Depend
         }
     finally:
         await conn.close()
+
+@app.on_event("startup")
+async def startup_event():
+    await init_db()
