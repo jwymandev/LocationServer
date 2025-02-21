@@ -12,5 +12,3 @@ packages:
         main: "app:app"        # Points to your FastAPI app in app.py (FastAPI instance is named 'app')
         runtime: "python:3.10"  # Specify the runtime version
         web: true
-        routes:
-          - path: "/"
