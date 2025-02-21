@@ -1,4 +1,4 @@
-envs:
+environment_variables:
   - key: DB_HOST
     value: ${DB_HOST}
   - key: DB_NAME
