@@ -29,7 +29,8 @@ if not ca_cert_content:
     raise Exception("Missing required environment variable: DB_CA_CERT_CONTENT")
 
 ssl_context = ssl.create_default_context(cadata=ca_cert_content)
-print("SSL CERT" + ca_cert_content)
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE
 
 key = os.getenv('ENCRYPTION_KEY')
 if not key:
