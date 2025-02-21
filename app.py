@@ -21,7 +21,11 @@ DB_CONFIG = {
     'user': os.getenv('DB_USER'),
     'password': os.getenv('DB_PASSWORD')
 }
-ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY').encode()
+
+key = os.getenv('ENCRYPTION_KEY')
+if not key:
+    raise Exception("Missing required environment variable: ENCRYPTION_KEY")
+ENCRYPTION_KEY = key.encode()
 
 # FastAPI app
 app = FastAPI()
