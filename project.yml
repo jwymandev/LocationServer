@@ -6,3 +6,4 @@ environment:
   DB_PASSWORD: "${DB_PASSWORD}"
   ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
   API_KEY: "${API_KEY}"
+  DB_CA_CERT: "${DB_CA_CERT}"

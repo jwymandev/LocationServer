@@ -24,6 +24,8 @@ DB_CONFIG = {
     'password': os.getenv('DB_PASSWORD')
 }
 
+ssl_context = ssl.create_default_context(os.getenv('DB_CA_CERT'))
+
 key = os.getenv('ENCRYPTION_KEY')
 if not key:
     raise Exception("Missing required environment variable: ENCRYPTION_KEY")
@@ -96,9 +98,6 @@ def decrypt_location(encrypted_data: str) -> tuple:
 
 # Database connection functions
 async def get_db_connection():
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
     return await asyncpg.connect(**DB_CONFIG, ssl=ssl_context)
 
 async def init_db():
