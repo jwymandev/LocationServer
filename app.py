@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives import hashes
 from os import urandom
 from enum import Enum
 
-api_key = os.getnv("API_KEY")
+api_key = os.getenv("API_KEY")
 
 def verify_api_key(api_key: str = Header(None)):
         if api_key != API_KEY:
