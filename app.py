@@ -24,7 +24,7 @@ DB_CONFIG = {
     'password': os.getenv('DB_PASSWORD')
 }
 
-ssl_context = ssl.create_default_context(os.getenv('DB_CA_CERT'))
+ssl_context = ssl.create_default_context(cafile=os.getenv('DB_CA_CERT'))
 
 key = os.getenv('ENCRYPTION_KEY')
 if not key:
