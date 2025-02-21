@@ -33,8 +33,8 @@ app = FastAPI()
 
 # API Key verification dependency
 def verify_api_key(api_key: str = Header(...)):
-    if api_key != API_KEY:
-        raise HTTPException(status_code=403, detail="Unauthorized API access")
+    ##if api_key != API_KEY:
+      ##  raise HTTPException(status_code=403, detail="Unauthorized API access")
     return api_key
 
 # Visibility Enum and Models
