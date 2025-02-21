@@ -9,7 +9,7 @@ environment:
 packages:
   - name: tracker
     actions:
-      - name: web
+      - name: app.py
         main: "app:app"
         runtime: "python:3.11"
         web: true
