@@ -10,6 +10,6 @@ packages:
   - name: tracker
     actions:
       - name: web
-        main: "app.py"
+        main: "app:app"
         runtime: "python:3.11"
         web: true
