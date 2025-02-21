@@ -6,6 +6,7 @@ apps:
         instance_count: 1
         instance_size_slug: basic-xxs
         http_port: 8080
+        run_command: start-command-here  python app.py
         envs:
           - key: DB_HOST
             value: ${DB_HOST}
