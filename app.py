@@ -24,7 +24,11 @@ DB_CONFIG = {
     'password': os.getenv('DB_PASSWORD')
 }
 
-ssl_context = ssl.create_default_context(cafile=os.getenv('DB_CA_CERT'))
+ca_cert_content = os.getenv('DB_CA_CERT')
+if not ca_cert_content:
+    raise Exception("Missing required environment variable: DB_CA_CERT_CONTENT")
+
+ssl_context = ssl.create_default_context(cadata=ca_cert_content)
 
 key = os.getenv('ENCRYPTION_KEY')
 if not key:
