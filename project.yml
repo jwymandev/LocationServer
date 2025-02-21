@@ -9,9 +9,8 @@ packages:
   - name: tracker
     functions:
       - name: web
-        main: "app:app"  # For example, if using uvicorn to run FastAPI app in app.py
-        runtime: "python:3.10"
+        main: "app:app"        # Points to your FastAPI app in app.py (FastAPI instance is named 'app')
+        runtime: "python:3.10"  # Specify the runtime version
         web: true
-        http_port: 8080
         routes:
           - path: "/"
