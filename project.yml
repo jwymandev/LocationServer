@@ -6,7 +6,7 @@ environment:
   ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
   API_KEY: "${API_KEY}"
 packages:
-  - name: LocationServer
+  - name: tracker
     functions:
       - name: web
         main: "app:app"        # Points to your FastAPI app in app.py (FastAPI instance is named 'app')
