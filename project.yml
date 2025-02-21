@@ -5,11 +5,3 @@ environment:
   DB_PASSWORD: "${DB_PASSWORD}"
   ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
   API_KEY: "${API_KEY}"
-
-packages:
-  - name: tracker
-    actions:
-      - name: web
-        main: "web/app.py"
-        runtime: "python:3.11"
-        web: true
