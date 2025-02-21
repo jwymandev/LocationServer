@@ -16,7 +16,7 @@ from enum import Enum
 api_key = os.getenv("API_KEY")
 
 def verify_api_key(api_key: str = Header(None)):
-        if api_key != API_KEY:
+        if api_key != self.api_key:
             raise HTTPException(status_code=403, detail="Unauthorized API access")
 
 class VisibilityState(str, Enum):
