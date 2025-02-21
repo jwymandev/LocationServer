@@ -3,7 +3,7 @@ import json
 import base64
 from typing import Optional, List
 from datetime import datetime
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel
 from geopy.distance import geodesic
 import asyncpg
@@ -13,12 +13,26 @@ from cryptography.hazmat.primitives import hashes
 from os import urandom
 from enum import Enum
 
-api_key = os.getenv("API_KEY")
+# Load API key and DB config from environment variables
+API_KEY = os.getenv("API_KEY")
+DB_CONFIG = {
+    'host': os.getenv('DB_HOST'),
+    'database': os.getenv('DB_NAME'),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD')
+}
+ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY').encode()
 
-def verify_api_key(api_key: str = Header(None)):
-        if api_key != self.api_key:
-            raise HTTPException(status_code=403, detail="Unauthorized API access")
+# FastAPI app
+app = FastAPI()
 
+# API Key verification dependency
+def verify_api_key(api_key: str = Header(...)):
+    if api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Unauthorized API access")
+    return api_key
+
+# Visibility Enum and Models
 class VisibilityState(str, Enum):
     PUBLIC = "public"  
     HIDDEN = "hidden"  
@@ -40,23 +54,12 @@ class NearestUserResponse(BaseModel):
     distance_km: float
     visibility: VisibilityState
 
-app = FastAPI()
-
-# Load environment variables
-DB_CONFIG = {
-    'host': os.getenv('DB_HOST'),
-    'database': os.getenv('DB_NAME'),
-    'user': os.getenv('DB_USER'),
-    'password': os.getenv('DB_PASSWORD')
-}
-ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY').encode()
-
-# Key Derivation for AES-GCM
+# Key derivation for AES-GCM
 def derive_key(secret: bytes) -> bytes:
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
-        salt=b"static_salt",
+        salt=b"static_salt",  # Consider making this configurable
         iterations=100000
     )
     return kdf.derive(secret)
@@ -85,6 +88,7 @@ def decrypt_location(encrypted_data: str) -> tuple:
     except Exception:
         raise HTTPException(status_code=500, detail="Decryption failed")
 
+# Database connection functions
 async def get_db_connection():
     return await asyncpg.connect(**DB_CONFIG)
 
@@ -102,9 +106,9 @@ async def init_db():
     finally:
         await conn.close()
 
+# Endpoints
 @app.post("/api/update_location")
-async def update_location(location: UserLocation):
-    verify_api_key(api_key)
+async def update_location(location: UserLocation, api_key: str = Depends(verify_api_key)):
     conn = await get_db_connection()
     try:
         encrypted_data = encrypt_location(location.latitude, location.longitude)
@@ -119,8 +123,7 @@ async def update_location(location: UserLocation):
         await conn.close()
 
 @app.post("/api/find_nearest")
-async def find_nearest_users(request: NearestUsersRequest):
-    verify_api_key(api_key)
+async def find_nearest_users(request: NearestUsersRequest, api_key: str = Depends(verify_api_key)):
     if request.limit < 1 or request.limit > 100:
         raise HTTPException(status_code=400, detail="Limit must be between 1 and 100")
 
@@ -154,6 +157,10 @@ async def find_nearest_users(request: NearestUsersRequest):
             })
 
         nearest_users.sort(key=lambda x: x['distance_km'])
-        return {"user_id": request.user_id, "nearest_users": nearest_users[:request.limit], "total_found": len(nearest_users)}
+        return {
+            "user_id": request.user_id,
+            "nearest_users": nearest_users[:request.limit],
+            "total_found": len(nearest_users)
+        }
     finally:
         await conn.close()
