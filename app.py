@@ -7,6 +7,7 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel
 from geopy.distance import geodesic
+from contextlib import asynccontextmanager
 import asyncpg
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -37,8 +38,13 @@ if not key:
     raise Exception("Missing required environment variable: ENCRYPTION_KEY")
 ENCRYPTION_KEY = key.encode()
 
-# FastAPI app
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup code: for example, initialize your database
+    await init_db()
+    yield
+    
+app = FastAPI(lifespan=lifespan)
 
 # API Key verification dependency
 def verify_api_key(api_key: str = Header(...)):
@@ -179,6 +185,3 @@ async def find_nearest_users(request: NearestUsersRequest, api_key: str = Depend
     finally:
         await conn.close()
 
-@app.on_event("startup")
-async def startup_event():
-    await init_db()
