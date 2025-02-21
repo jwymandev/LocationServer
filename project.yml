@@ -8,8 +8,8 @@ environment:
 
 packages:
   - name: tracker
-    functions:
+    actions:
       - name: web
-        main: "web/app.py:app"        # Points to your FastAPI app in app.py (FastAPI instance is named 'app')
-        runtime: "python:3.11"  # Specify the runtime version
+        main: "app.py"
+        runtime: "python:3.11"
         web: true
