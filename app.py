@@ -1,6 +1,7 @@
 import os
 import json
 import base64
+import ssl
 from typing import Optional, List
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Header, Depends
@@ -94,6 +95,7 @@ def decrypt_location(encrypted_data: str) -> tuple:
 
 # Database connection functions
 async def get_db_connection():
+    ssl.create_default_context()
     return await asyncpg.connect(**DB_CONFIG)
 
 async def init_db():
