@@ -142,7 +142,7 @@ async def update_location(location: UserLocation, api_key: str = Depends(verify_
     finally:
         await conn.close()
 
-@app.post("/api/find_nearest")
+@app.post("/api/nearby")
 async def find_nearest_users(request: NearestUsersRequest, api_key: str = Depends(verify_api_key)):
     if request.limit < 1 or request.limit > 100:
         raise HTTPException(status_code=400, detail="Limit must be between 1 and 100")
