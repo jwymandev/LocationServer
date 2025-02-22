@@ -150,15 +150,21 @@ async def find_nearest_users(request: NearestUsersRequest, api_key: str = Depend
     conn = await get_db_connection()
     try:
         user_location = await conn.fetchrow('''
-            SELECT encrypted_data FROM user_locations WHERE user_id = $1
+            SELECT encrypted_data FROM user_locations 
+            WHERE user_id = $1
+              AND timestamp > NOW() - INTERVAL '48 hours'  
         ''', request.user_id)
+        if not user_location:
+            raise HTTPException(status_code=404, detail="User location not found or is older than 48 hours")
         
         if not user_location:
             raise HTTPException(status_code=404, detail="User location not found")
 
         other_locations = await conn.fetch('''
             SELECT user_id, encrypted_data, visibility FROM user_locations 
-            WHERE user_id != $1 AND visibility != 'private'
+            WHERE user_id != $1 
+                AND visibility != 'private'
+                AND timestamp > NOW() - INTERVAL '48 hours'                           
         ''', request.user_id)
 
         user_lat, user_lon = decrypt_location(user_location['encrypted_data'])
