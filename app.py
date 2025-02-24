@@ -4,7 +4,7 @@ import base64
 import ssl
 from typing import Optional, List
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, Header, Depends, status, requests
+from fastapi import FastAPI, HTTPException, Header, Depends, status, Request
 from pydantic import BaseModel
 from geopy.distance import geodesic
 from contextlib import asynccontextmanager
