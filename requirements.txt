@@ -4,3 +4,4 @@ asyncpg
 geopy
 cryptography
 python-dotenv
+requests
