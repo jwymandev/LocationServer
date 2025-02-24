@@ -69,6 +69,12 @@ class NearestUsersRequest(BaseModel):
     limit: int = 10
     max_distance_km: Optional[float] = None
 
+class NearestByCoordinatesRequest(BaseModel):
+    latitude: float
+    longitude: float
+    limit: int = 10
+    max_distance_km: Optional[float] = None
+
 class NearestUserResponse(BaseModel):
     user_id: str
     distance_km: float
@@ -143,11 +149,10 @@ async def verify_rocketchat_auth(request: Request):
     }
     
     try:
-        # Use the 'requests' module here.
         response = request.get(f"{ROCKETCHAT_BASE_URL}{ME_ENDPOINT}", headers=headers, timeout=3)
     except request.RequestException:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail="Unable to verify credentials at this time")
+                        detail="Unable to verify credentials at this time")
     
     if response.status_code != 200:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
