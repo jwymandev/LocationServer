@@ -4,7 +4,8 @@ import base64
 import ssl
 from typing import Optional, List
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends, status
+import requests
 from pydantic import BaseModel
 from geopy.distance import geodesic
 from contextlib import asynccontextmanager
@@ -126,9 +127,43 @@ async def init_db():
     finally:
         await conn.close()
 
+ROCKETCHAT_BASE_URL = "https://chatdev.cuffd.io"
+ME_ENDPOINT = "/api/v1/me"
+
+async def verify_rocketchat_auth(request: Request):
+    # Extract required headers from the incoming request.
+    auth_token = request.headers.get("X-Auth-Token")
+    auth_id = request.headers.get("X-User-Id")  # Adjust header name if needed.
+    if not auth_token or not auth_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Missing authentication headers")
+    
+    # Verify credentials against Rocket.Chat.
+    headers = {
+        "X-Auth-Token": auth_token,
+        "X-User-Id": auth_id
+    }
+    
+    try:
+        response = requests.get(f"{ROCKETCHAT_BASE_URL}{ME_ENDPOINT}", headers=headers, timeout=3)
+    except requests.RequestException:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="Unable to verify credentials at this time")
+    
+    if response.status_code != 200:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid authentication credentials")
+    
+    # Optionally, return some info from Rocket.Chat's response.
+    return True
+
 # Endpoints
 @app.post("/api/update_location")
-async def update_location(location: UserLocation, api_key: str = Depends(verify_api_key)):
+async def update_location(
+    location: UserLocation,
+    api_key: str = Depends(verify_api_key),
+    auth_verified: bool = Depends(verify_rocketchat_auth)
+):
     conn = await get_db_connection()
     try:
         encrypted_data = encrypt_location(location.latitude, location.longitude)
