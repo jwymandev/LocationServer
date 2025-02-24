@@ -144,8 +144,8 @@ async def verify_rocketchat_auth(request: Request):
     
     try:
         # Use the 'requests' module here.
-        response = requests.get(f"{ROCKETCHAT_BASE_URL}{ME_ENDPOINT}", headers=headers, timeout=3)
-    except requests.RequestException:
+        response = request.get(f"{ROCKETCHAT_BASE_URL}{ME_ENDPOINT}", headers=headers, timeout=3)
+    except request.RequestException:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                             detail="Unable to verify credentials at this time")
     
