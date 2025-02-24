@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from geopy.distance import geodesic
 from contextlib import asynccontextmanager
 import asyncpg
+import requests  # <-- Import the requests module
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
@@ -40,7 +41,6 @@ ENCRYPTION_KEY = key.encode()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup code: for example, initialize your database
     await init_db()
     yield
     
@@ -64,6 +64,7 @@ class UserLocation(BaseModel):
     longitude: float
     visibility: VisibilityState = VisibilityState.PUBLIC
 
+# Use a dedicated request model for finding nearest users.
 class NearestUsersRequest(BaseModel):
     user_id: str
     limit: int = 10
@@ -126,26 +127,26 @@ async def init_db():
     finally:
         await conn.close()
 
+# Rocket.Chat auth settings
 ROCKETCHAT_BASE_URL = "https://chatdev.cuffd.io"
 ME_ENDPOINT = "/api/v1/me"
 
 async def verify_rocketchat_auth(request: Request):
-    # Extract required headers from the incoming request.
     auth_token = request.headers.get("X-Auth-Token")
     auth_id = request.headers.get("X-User-Id")  # Adjust header name if needed.
     if not auth_token or not auth_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Missing authentication headers")
     
-    # Verify credentials against Rocket.Chat.
     headers = {
         "X-Auth-Token": auth_token,
         "X-User-Id": auth_id
     }
     
     try:
-        response = request.get(f"{ROCKETCHAT_BASE_URL}{ME_ENDPOINT}", headers=headers, timeout=3)
-    except request.RequestException:
+        # Use the 'requests' module here.
+        response = requests.get(f"{ROCKETCHAT_BASE_URL}{ME_ENDPOINT}", headers=headers, timeout=3)
+    except requests.RequestException:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                             detail="Unable to verify credentials at this time")
     
@@ -153,7 +154,6 @@ async def verify_rocketchat_auth(request: Request):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Invalid authentication credentials")
     
-    # Optionally, return some info from Rocket.Chat's response.
     return True
 
 # Endpoints
@@ -178,11 +178,11 @@ async def update_location(
 
 @app.post("/api/nearby")
 async def find_nearest_users(
-    location: UserLocation,
+    req: NearestUsersRequest,  # Change parameter name to 'req'
     api_key: str = Depends(verify_api_key),
     auth_verified: bool = Depends(verify_rocketchat_auth)
 ):
-    if request.limit < 1 or request.limit > 100:
+    if req.limit < 1 or req.limit > 100:
         raise HTTPException(status_code=400, detail="Limit must be between 1 and 100")
 
     conn = await get_db_connection()
@@ -191,19 +191,16 @@ async def find_nearest_users(
             SELECT encrypted_data FROM user_locations 
             WHERE user_id = $1
               AND timestamp > NOW() - INTERVAL '48 hours'  
-        ''', request.user_id)
+        ''', req.user_id)
         if not user_location:
             raise HTTPException(status_code=404, detail="User location not found or is older than 48 hours")
         
-        if not user_location:
-            raise HTTPException(status_code=404, detail="User location not found")
-
         other_locations = await conn.fetch('''
             SELECT user_id, encrypted_data, visibility FROM user_locations 
             WHERE user_id != $1 
                 AND visibility != 'private'
                 AND timestamp > NOW() - INTERVAL '48 hours'                           
-        ''', request.user_id)
+        ''', req.user_id)
 
         user_lat, user_lon = decrypt_location(user_location['encrypted_data'])
         user_point = (user_lat, user_lon)
@@ -212,7 +209,7 @@ async def find_nearest_users(
         for loc in other_locations:
             lat, lon = decrypt_location(loc['encrypted_data'])
             distance = geodesic(user_point, (lat, lon)).kilometers
-            if request.max_distance_km and distance > request.max_distance_km:
+            if req.max_distance_km and distance > req.max_distance_km:
                 continue
             nearest_users.append({
                 "user_id": loc['user_id'],
@@ -222,10 +219,9 @@ async def find_nearest_users(
 
         nearest_users.sort(key=lambda x: x['distance_km'])
         return {
-            "user_id": request.user_id,
-            "nearest_users": nearest_users[:request.limit],
+            "user_id": req.user_id,
+            "nearest_users": nearest_users[:req.limit],
             "total_found": len(nearest_users)
         }
     finally:
         await conn.close()
-
