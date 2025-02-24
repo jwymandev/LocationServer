@@ -138,21 +138,17 @@ ME_ENDPOINT = "/api/v1/me"
 
 async def verify_rocketchat_auth(request: Request):
     auth_token = request.headers.get("X-Auth-Token")
-    auth_id = request.headers.get("X-User-Id")  # Adjust header name if needed.
+    auth_id = request.headers.get("X-User-Id")
     if not auth_token or not auth_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Missing authentication headers")
     
-    headers = {
-        "X-Auth-Token": auth_token,
-        "X-User-Id": auth_id
-    }
-    
+    headers = {"X-Auth-Token": auth_token, "X-User-Id": auth_id}
     try:
         response = request.get(f"{ROCKETCHAT_BASE_URL}{ME_ENDPOINT}", headers=headers, timeout=3)
     except request.RequestException:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                        detail="Unable to verify credentials at this time")
+                            detail="Unable to verify credentials at this time")
     
     if response.status_code != 200:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
