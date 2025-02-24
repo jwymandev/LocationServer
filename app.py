@@ -134,7 +134,9 @@ async def init_db():
         await conn.close()
 
 # Rocket.Chat auth settings
-ROCKETCHAT_BASE_URL = "https://chatdev.cuffd.io"
+ROCKETCHAT_BASE_URL = os.getenv("ROCKETCHAT_BASE_URL")
+if not ROCKETCHAT_BASE_URL:
+    raise Exception("Missing required environment variable: ROCKETCHAT_BASE_URL")
 ME_ENDPOINT = "/api/v1/me"
 
 async def verify_rocketchat_auth(request: Request):
@@ -181,6 +183,52 @@ async def update_location(
             DO UPDATE SET encrypted_data = $2, visibility = $3, timestamp = CURRENT_TIMESTAMP
         ''', location.user_id, encrypted_data, location.visibility)
         return {"status": "success", "message": "Location updated", "visibility": location.visibility}
+    finally:
+        await conn.close()
+
+@app.post("/api/nearby_by_coordinates")
+async def find_nearest_users_by_coords(
+    req: NearestByCoordinatesRequest,
+    api_key: str = Depends(verify_api_key),
+    auth_verified: bool = Depends(verify_rocketchat_auth)
+):
+    if req.limit < 1 or req.limit > 100:
+        raise HTTPException(status_code=400, detail="Limit must be between 1 and 100")
+    
+    conn = await get_db_connection()
+    try:
+        # Fetch all user locations that are recent and not private.
+        other_locations = await conn.fetch('''
+            SELECT user_id, encrypted_data, visibility FROM user_locations 
+            WHERE visibility != 'private'
+              AND timestamp > NOW() - INTERVAL '48 hours'
+        ''')
+        
+        # Create a reference point from the provided coordinates.
+        reference_point = (req.latitude, req.longitude)
+        nearest_users = []
+        
+        for loc in other_locations:
+            try:
+                lat, lon = decrypt_location(loc['encrypted_data'])
+                distance = geodesic(reference_point, (lat, lon)).kilometers
+                if req.max_distance_km and distance > req.max_distance_km:
+                    continue
+                nearest_users.append({
+                    "user_id": loc['user_id'],
+                    "distance_km": round(distance, 2),
+                    "visibility": loc['visibility']
+                })
+            except Exception as e:
+                print(f"Error decrypting location for user {loc['user_id']}: {e}")
+                continue
+        
+        nearest_users.sort(key=lambda x: x['distance_km'])
+        return {
+            "user_id": None,
+            "nearest_users": nearest_users[:req.limit],
+            "total_found": len(nearest_users)
+        }
     finally:
         await conn.close()
 
