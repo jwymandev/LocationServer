@@ -5,3 +5,4 @@ geopy
 cryptography
 python-dotenv
 requests
+pydantic

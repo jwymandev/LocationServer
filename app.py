@@ -182,7 +182,12 @@ async def update_location(
             ON CONFLICT (user_id) 
             DO UPDATE SET encrypted_data = $2, visibility = $3, timestamp = CURRENT_TIMESTAMP
         ''', location.user_id, encrypted_data, location.visibility)
-        return {"status": "success", "message": "Location updated", "visibility": location.visibility}
+        # Wrap the result in the APIResponse format.
+        return {
+            "status": "success",
+            "message": "Location updated",
+            "data": {}   # Use an empty object when there’s no additional data
+        }
     finally:
         await conn.close()
 
@@ -234,13 +239,13 @@ async def find_nearest_users_by_coords(
 
 @app.post("/api/nearby")
 async def find_nearest_users(
-    req: NearestUsersRequest,  # Change parameter name to 'req'
+    req: NearestUsersRequest,
     api_key: str = Depends(verify_api_key),
     auth_verified: bool = Depends(verify_rocketchat_auth)
 ):
     if req.limit < 1 or req.limit > 100:
         raise HTTPException(status_code=400, detail="Limit must be between 1 and 100")
-
+    
     conn = await get_db_connection()
     try:
         user_location = await conn.fetchrow('''
@@ -257,10 +262,10 @@ async def find_nearest_users(
                 AND visibility != 'private'
                 AND timestamp > NOW() - INTERVAL '48 hours'                           
         ''', req.user_id)
-
+    
         user_lat, user_lon = decrypt_location(user_location['encrypted_data'])
         user_point = (user_lat, user_lon)
-
+    
         nearest_users = []
         for loc in other_locations:
             lat, lon = decrypt_location(loc['encrypted_data'])
@@ -272,12 +277,16 @@ async def find_nearest_users(
                 "distance_km": round(distance, 2),
                 "visibility": loc['visibility']
             })
-
+    
         nearest_users.sort(key=lambda x: x['distance_km'])
         return {
-            "user_id": req.user_id,
-            "nearest_users": nearest_users[:req.limit],
-            "total_found": len(nearest_users)
+            "status": "success",
+            "message": "",
+            "data": {
+                "user_id": req.user_id,
+                "nearest_users": nearest_users[:req.limit],
+                "total_found": len(nearest_users)
+            }
         }
     finally:
         await conn.close()
