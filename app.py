@@ -248,20 +248,41 @@ async def find_nearest_users(
     
     conn = await get_db_connection()
     try:
+        # First try with 48-hour window
         user_location = await conn.fetchrow('''
             SELECT encrypted_data FROM user_locations 
             WHERE user_id = $1
               AND timestamp > NOW() - INTERVAL '48 hours'  
         ''', req.user_id)
-        if not user_location:
-            raise HTTPException(status_code=404, detail="User location not found or is older than 48 hours")
         
+        # If no location found, try with a 7-day window instead
+        if not user_location:
+            user_location = await conn.fetchrow('''
+                SELECT encrypted_data FROM user_locations 
+                WHERE user_id = $1
+                  AND timestamp > NOW() - INTERVAL '7 days'  
+            ''', req.user_id)
+            
+            # If still no location, return the 404 error
+            if not user_location:
+                raise HTTPException(status_code=404, detail="User location not found or is older than 7 days")
+        
+        # Similar approach for finding other users' locations - first try 48 hours
         other_locations = await conn.fetch('''
             SELECT user_id, encrypted_data, visibility FROM user_locations 
             WHERE user_id != $1 
                 AND visibility != 'private'
                 AND timestamp > NOW() - INTERVAL '48 hours'                           
         ''', req.user_id)
+        
+        # If no results, expand to 7 days
+        if not other_locations:
+            other_locations = await conn.fetch('''
+                SELECT user_id, encrypted_data, visibility FROM user_locations 
+                WHERE user_id != $1 
+                    AND visibility != 'private'
+                    AND timestamp > NOW() - INTERVAL '7 days'                           
+            ''', req.user_id)
     
         user_lat, user_lon = decrypt_location(user_location['encrypted_data'])
         user_point = (user_lat, user_lon)
@@ -279,13 +300,22 @@ async def find_nearest_users(
             })
     
         nearest_users.sort(key=lambda x: x['distance_km'])
+        
+        # Include the time window used in the response
+        time_window = "7 days" if not await conn.fetchrow('''
+            SELECT 1 FROM user_locations 
+            WHERE user_id = $1
+              AND timestamp > NOW() - INTERVAL '48 hours'  
+        ''', req.user_id) else "48 hours"
+        
         return {
             "status": "success",
-            "message": "",
+            "message": f"Using locations from the last {time_window}",
             "data": {
                 "user_id": req.user_id,
                 "nearest_users": nearest_users[:req.limit],
-                "total_found": len(nearest_users)
+                "total_found": len(nearest_users),
+                "time_window": time_window
             }
         }
     finally:
