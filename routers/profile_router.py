@@ -67,9 +67,17 @@ async def update_profile(
     if user_id != profile.coreProfile.user_id:
         raise HTTPException(status_code=400, detail="User ID in path must match user ID in profile")
     
+    # Prepare interests data
+    interests_json = None
+    if profile.extendedProfile.interests is not None:
+        try:
+            interests_json = json.dumps(profile.extendedProfile.interests)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to encode interests: {str(e)}")
+    
     query = """
     INSERT INTO profiles (user_id, username, name, avatar, birthday, hometown, description, interests)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     ON CONFLICT (user_id)
     DO UPDATE SET
         username = EXCLUDED.username,
@@ -82,36 +90,41 @@ async def update_profile(
     RETURNING *;
     """
     
-    row = await db.fetchrow(
-        query,
-        profile.coreProfile.user_id,
-        profile.coreProfile.username,
-        profile.coreProfile.name,
-        profile.coreProfile.avatar,
-        profile.extendedProfile.birthday,
-        profile.extendedProfile.hometown,
-        profile.extendedProfile.description,
-        json.dumps(profile.extendedProfile.interests) if profile.extendedProfile.interests is not None else None,
-    )
-    
-    if row is None:
-        raise HTTPException(status_code=500, detail="Profile update failed")
-    
-    updated = dict(row)
-    
-    core = CoreProfile(
-        user_id=updated.get("user_id"),
-        username=updated.get("username"),
-        name=updated.get("name"),
-        avatar=updated.get("avatar")
-    )
-    
-    ext = ExtendedProfile(
-        birthday=updated.get("birthday"),
-        hometown=updated.get("hometown"),
-        description=updated.get("description"),
-        interests=updated.get("interests")
-    )
-    
-    # Return directly as CombinedProfile to match the response_model
-    return CombinedProfile(coreProfile=core, extendedProfile=ext)
+    try:
+        row = await db.fetchrow(
+            query,
+            profile.coreProfile.user_id,
+            profile.coreProfile.username,
+            profile.coreProfile.name,
+            profile.coreProfile.avatar,
+            profile.extendedProfile.birthday,
+            profile.extendedProfile.hometown,
+            profile.extendedProfile.description,
+            interests_json
+        )
+        
+        if row is None:
+            raise HTTPException(status_code=500, detail="Profile update failed - no rows returned")
+            
+        updated = dict(row)
+        
+        core = CoreProfile(
+            user_id=updated.get("user_id"),
+            username=updated.get("username"),
+            name=updated.get("name"),
+            avatar=updated.get("avatar")
+        )
+        
+        ext = ExtendedProfile(
+            birthday=updated.get("birthday"),
+            hometown=updated.get("hometown"),
+            description=updated.get("description"),
+            interests=updated.get("interests")
+        )
+        
+        return CombinedProfile(coreProfile=core, extendedProfile=ext)
+        
+    except Exception as e:
+        # Log the error for debugging
+        print(f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
