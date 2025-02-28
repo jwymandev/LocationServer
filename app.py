@@ -3,7 +3,7 @@ import os
 import asyncpg
 import ssl
 from fastapi import FastAPI
-from location_router import router as location_router, init_db as init_location_db
+from location_router import router as location_router
 from profile_router import router as profile_router
 
 # Database configuration
