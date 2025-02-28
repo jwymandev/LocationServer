@@ -29,8 +29,7 @@ app = FastAPI()
 async def startup():
     # Create a connection pool and store it in app.state
     app.state.db_pool = await asyncpg.create_pool(**DB_CONFIG, ssl=ssl_context)
-    # Initialize your database schema if necessary (for location API, for example)
-    await init_location_db(app.state.db_pool)
+
 
 @app.on_event("shutdown")
 async def shutdown():
