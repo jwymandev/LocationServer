@@ -36,18 +36,18 @@ async def get_profile(user_id: str, db: asyncpg.Connection = Depends(get_db)):
     if row is None:
         raise HTTPException(status_code=404, detail="Profile not found")
     profile_dict = dict(row)
-    # Create the core and extended profile parts.
+    default_birthday = "1970-01-01"
     core = CoreProfile(
-        user_id = profile_dict.get("user_id"),
-        username = profile_dict.get("username"),
-        name = profile_dict.get("name"),
-        avatar = profile_dict.get("avatar")
+        user_id=profile_dict.get("user_id"),
+        username=profile_dict.get("username"),
+        name=profile_dict.get("name"),
+        avatar=profile_dict.get("avatar")
     )
     ext = ExtendedProfile(
-        birthday = profile_dict.get("birthday"),
-        hometown = profile_dict.get("hometown"),
-        description = profile_dict.get("description"),
-        interests = profile_dict.get("interests")  # assuming this is stored as JSON in the DB
+        birthday=profile_dict.get("birthday") or default_birthday,
+        hometown=profile_dict.get("hometown"),
+        description=profile_dict.get("description"),
+        interests=profile_dict.get("interests")
     )
     return CombinedProfile(coreProfile=core, extendedProfile=ext)
 
