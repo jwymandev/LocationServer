@@ -6,5 +6,5 @@ from your_db_module import lifespan  # Your lifespan function that sets up the d
 app = FastAPI(lifespan=lifespan)
 
 # Include routers with prefixes.
-app.include_router(profile_router)
-app.include_router(location_router)
+app.include_router(profile_router, prefix="/api")
+app.include_router(location_router, prefic="/api")
