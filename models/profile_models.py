@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any, List
 from datetime import date
 
 class ExtendedProfile(BaseModel):
-    birthday: Optional[str] = None
+    birthday: Optional[date] = None
     hometown: Optional[str] = None
     description: Optional[str] = None
     interests: Optional[Dict[str, Any]] = None
