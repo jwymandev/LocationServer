@@ -14,6 +14,12 @@ class ExtendedProfile(BaseModel):
     description: Optional[str] = None
     interests: Optional[List[str]] = None
 
+    @validator('birthday', pre=True)
+    def parse_birthday(cls, v):
+        if isinstance(v, date):
+            return v.isoformat()
+        return v
+
 class CombinedProfile(BaseModel):
     coreProfile: CoreProfile
     extendedProfile: ExtendedProfile
