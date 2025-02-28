@@ -16,24 +16,6 @@ from cryptography.hazmat.primitives import hashes
 from os import urandom
 from enum import Enum
 
-# Load API key and DB config from environment variables
-API_KEY = os.getenv("API_KEY")
-DB_CONFIG = {
-    'host': os.getenv('DB_HOST'),
-    'port': int(os.getenv('DB_PORT', 5432)),  # Default PostgreSQL port
-    'database': os.getenv('DB_NAME'),
-    'user': os.getenv('DB_USER'),
-    'password': os.getenv('DB_PASSWORD')
-}
-
-ca_cert_content = os.getenv('DB_CA_CERT')
-if not ca_cert_content:
-    raise Exception("Missing required environment variable: DB_CA_CERT_CONTENT")
-
-ssl_context = ssl.create_default_context(cadata=ca_cert_content)
-ssl_context.check_hostname = False
-ssl_context.verify_mode = ssl.CERT_NONE
-
 key = os.getenv('ENCRYPTION_KEY')
 if not key:
     raise Exception("Missing required environment variable: ENCRYPTION_KEY")
@@ -45,6 +27,8 @@ async def lifespan(app: FastAPI):
     yield
     
 app = FastAPI(lifespan=lifespan)
+
+
 
 # API Key verification dependency
 def verify_api_key(api_key: str = Header(...)):
