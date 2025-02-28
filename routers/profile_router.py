@@ -113,8 +113,5 @@ async def update_profile(
         interests=updated.get("interests")
     )
     
-    return {
-        "status": "success",
-        "message": "Profile updated",
-        "data": CombinedProfile(coreProfile=core, extendedProfile=ext)
-    }
+    # Return directly as CombinedProfile to match the response_model
+    return CombinedProfile(coreProfile=core, extendedProfile=ext)

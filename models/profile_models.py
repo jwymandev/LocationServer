@@ -17,3 +17,8 @@ class ExtendedProfile(BaseModel):
 class CombinedProfile(BaseModel):
     coreProfile: CoreProfile
     extendedProfile: ExtendedProfile
+
+class ProfileResponse(BaseModel):
+    status: str
+    message: str
+    data: CombinedProfile
