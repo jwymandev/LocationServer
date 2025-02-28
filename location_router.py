@@ -5,7 +5,7 @@ import ssl
 import requests
 from typing import Optional, List
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, Header, Depends, status, Request
+from fastapi import FastAPI, HTTPException, Header, Depends, status, Request, APIRouter
 from pydantic import BaseModel
 from geopy.distance import geodesic
 from contextlib import asynccontextmanager
@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     await init_db()
     yield
     
-app = FastAPI(lifespan=lifespan)
+router = APIRouter()
 
 
 
