@@ -1,8 +1,9 @@
-from pydantic import BaseModel, validator
-from typing import Optional, Dict, Any, List
-from datetime import date
+from pydantic import BaseModel
+from typing import Generic, Optional, TypeVar
 
-class APIResponse(BaseModel):
+T = TypeVar('T')
+
+class APIResponse(BaseModel, Generic[T]):
     status: str
-    data: Optional[Any] = None
-    message: Optional[str] = None
+    data: Optional[T]
+    message: Optional[str]

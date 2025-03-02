@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends
 # Import from modules
 from dependencies import get_db, verify_api_key, verify_rocketchat_auth
 from models.profile_models import CoreProfile, ExtendedProfile, CombinedProfile
-from models.shared import APIResponse  # Import APIResponse
+from models.shared import APIResponse
 
 # Create an APIRouter instance
 router = APIRouter()
@@ -17,12 +17,11 @@ async def get_profile(
     api_key: str = Depends(verify_api_key),
     auth_verified: bool = Depends(verify_rocketchat_auth),
     db: asyncpg.Connection = Depends(get_db)
-) -> APIResponse[CombinedProfile]:
+):
     row = await db.fetchrow("SELECT * FROM profiles WHERE user_id=$1", user_id)
     
-    combined: CombinedProfile
     if row is None:
-        # Return a default profile if none is found.
+        # Return a default profile instead of 404
         core = CoreProfile(
             user_id=user_id,
             username="DefaultUsername",
@@ -30,36 +29,36 @@ async def get_profile(
             avatar=None
         )
         ext = ExtendedProfile(
-            birthday="1970-01-01",  # Or a fixed date, e.g. using a formatter from "1970-01-01"
+            birthday="1970-01-01",
             hometown=None,
             description=None,
             interests=None
         )
-        combined = CombinedProfile(coreProfile=core, extendedProfile=ext)
-    else:
-        profile_dict = dict(row)
-        defaultBirthdayString = "1970-01-01"
-        
-        core = CoreProfile(
-            user_id=profile_dict.get("user_id"),
-            username=profile_dict.get("username"),
-            name=profile_dict.get("name"),
-            avatar=profile_dict.get("avatar")
-        )
-        
-        # If birthday is stored as a string.
-        birthdayValue = profile_dict.get("birthday") or defaultBirthdayString
-        
-        ext = ExtendedProfile(
-            birthday=birthdayValue,
-            hometown=profile_dict.get("hometown"),
-            description=profile_dict.get("description"),
-            interests=profile_dict.get("interests")
-        )
-        
-        combined = CombinedProfile(coreProfile=core, extendedProfile=ext)
+        return CombinedProfile(coreProfile=core, extendedProfile=ext)
     
-    return APIResponse(status="success", data=combined, message="")
+    profile_dict = dict(row)
+    default_birthday = "1970-01-01"
+    
+    core = CoreProfile(
+        user_id=profile_dict.get("user_id"),
+        username=profile_dict.get("username"),
+        name=profile_dict.get("name"),
+        avatar=profile_dict.get("avatar")
+    )
+    
+    ext = ExtendedProfile(
+        birthday=profile_dict.get("birthday") or default_birthday,
+        hometown=profile_dict.get("hometown"),
+        description=profile_dict.get("description"),
+        interests=profile_dict.get("interests")
+    )
+    combined = CombinedProfile(coreProfile=core, extendedProfile=ext)   
+
+    return {
+        "status": "success",
+        "data": combined,
+        "message": ""
+    }
 
 
 @router.put("/{user_id}", response_model=CombinedProfile)
