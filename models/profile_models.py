@@ -6,7 +6,7 @@ class ExtendedProfile(BaseModel):
     birthday: Optional[date] = None
     hometown: Optional[str] = None
     description: Optional[str] = None
-    interests: Optional[Dict[str, Any]] = None
+    interests: Optional[List[str]] = None
     
     @validator('birthday', pre=True)
     def parse_birthday(cls, v):
