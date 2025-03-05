@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from routers.location_router import router as location_router
 from routers.profile_router import router as profile_router
 from routers.interest_router import router as interest_router
+from routers.album_router import router as album_router
 from config import get_db_config, get_ssl_context
 
 app = FastAPI()
@@ -70,3 +71,4 @@ async def shutdown():
 app.include_router(location_router, prefix="/api")
 app.include_router(profile_router, prefix="/api/profile")
 app.include_router(interest_router, prefix="/api/interests")
+app.include_router(album_router, prefix="/api/albums")
