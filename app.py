@@ -5,6 +5,7 @@ import ssl
 from fastapi import FastAPI
 from routers.location_router import router as location_router
 from routers.profile_router import router as profile_router
+from routers.interest_router import router as interest_router
 from config import get_db_config, get_ssl_context
 
 app = FastAPI()
