@@ -38,6 +38,19 @@ async def init_db(pool):
         );
         ''')
 
+        #Create Albums table
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS albums (
+                album_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT,
+                images JSONB,
+                public BOOLEAN NOT NULL DEFAULT FALSE,
+                FOREIGN KEY (user_id) REFERENCES profiles(user_id) ON DELETE CASCADE
+            );
+        ''')
+
 @app.on_event("startup")
 async def startup():
     # Create a connection pool and store it in app.state
