@@ -7,6 +7,7 @@ from routers.location_router import router as location_router
 from routers.profile_router import router as profile_router
 from routers.interest_router import router as interest_router
 from routers.album_router import router as album_router
+from routers.blocked_router import router as blocked_router
 from config import get_db_config, get_ssl_context
 
 app = FastAPI()
@@ -53,6 +54,28 @@ async def init_db(pool):
             );
         ''')
 
+        await conn.exectute('''
+            CREATE TABLE IF NOT EXISTS album_access_requests (
+                request_id TEXT PRIMARY KEY,
+                album_id TEXT NOT NULL,
+                requester_id TEXT NOT NULL,
+                status TEXT NOT NULL,  -- e.g. "pending", "approved", "rejected"
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (album_id) REFERENCES albums(album_id) ON DELETE CASCADE
+            );
+                            ''')
+        
+        await conn.exectute('''
+            CREATE TABLE IF NOT EXISTS blocked_users (
+                blocker_id TEXT NOT NULL,
+                blocked_id TEXT NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (blocker_id, blocked_id)
+            );
+            
+                            ''')
+        
+
 @app.on_event("startup")
 async def startup():
     # Create a connection pool and store it in app.state
@@ -72,3 +95,4 @@ app.include_router(location_router, prefix="/api")
 app.include_router(profile_router, prefix="/api/profile")
 app.include_router(interest_router, prefix="/api/interests")
 app.include_router(album_router, prefix="/api/albums")
+app.include_router(blocked_router, prefix="/api/blocked")

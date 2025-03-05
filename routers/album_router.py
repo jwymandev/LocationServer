@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from models.album_model import Album
-from dependencies import get_db, get_current_user_id  # Your helper dependencies
+from dependencies import get_db, get_current_user_id, verify_rocketchat_auth  # Added verify_rocketchat_auth
 import asyncpg
 
 router = APIRouter()
@@ -12,13 +12,14 @@ router = APIRouter()
 async def create_album(
     album: Album,
     db: asyncpg.Connection = Depends(get_db),
-    current_user: str = Depends(get_current_user_id)
+    current_user: str = Depends(get_current_user_id),
+    auth_verified: bool = Depends(verify_rocketchat_auth)  # Verifies Rocket.Chat login
 ):
     # Ensure the album is being created by the current user.
     if album.user_id != current_user:
         raise HTTPException(status_code=403, detail="Cannot create album for another user")
     
-    # Validate permission if needed
+    # Validate permission if needed (assuming your Album model has a validate_permission method)
     album.permission = Album.validate_permission(album.permission)
     
     # Generate a unique album ID.
@@ -54,7 +55,8 @@ async def update_album(
     album_id: str,
     album: Album,
     db: asyncpg.Connection = Depends(get_db),
-    current_user: str = Depends(get_current_user_id)
+    current_user: str = Depends(get_current_user_id),
+    auth_verified: bool = Depends(verify_rocketchat_auth)  # Verify Rocket.Chat login
 ):
     # Fetch the existing album.
     existing = await db.fetchrow("SELECT * FROM albums WHERE album_id=$1", album_id)
@@ -92,7 +94,8 @@ async def update_album(
 async def get_album(
     album_id: str,
     db: asyncpg.Connection = Depends(get_db),
-    current_user: str = Depends(get_current_user_id)
+    current_user: str = Depends(get_current_user_id),
+    auth_verified: bool = Depends(verify_rocketchat_auth)  # Verify Rocket.Chat login
 ):
     album = await db.fetchrow("SELECT * FROM albums WHERE album_id=$1", album_id)
     if not album:
@@ -111,7 +114,6 @@ async def get_album(
     allowed_users: List[str] = []
     if allowed_users_json is not None:
         if isinstance(allowed_users_json, str):
-            # In case the JSON is stored as a string, decode it.
             allowed_users = json.loads(allowed_users_json)
         elif isinstance(allowed_users_json, list):
             allowed_users = allowed_users_json
@@ -126,19 +128,21 @@ async def get_album(
 
 @router.get("/", response_model=List[Album])
 async def list_albums(
-    db: asyncpg.Connection = Depends(get_db)
+    db: asyncpg.Connection = Depends(get_db),
+    auth_verified: bool = Depends(verify_rocketchat_auth)  # Optionally verify auth
 ):
     # Return only public albums for now.
     rows = await db.fetch("SELECT * FROM albums WHERE public = TRUE")
     return [Album(**dict(row)) for row in rows]
 
+
 @router.get("/myalbums", response_model=List[Album])
-async def list_albums(
+async def list_myalbums(
     db: asyncpg.Connection = Depends(get_db),
-    current_user: str = Depends(get_current_user_id)
+    current_user: str = Depends(get_current_user_id),
+    auth_verified: bool = Depends(verify_rocketchat_auth)
 ):
-    # This query can be adjusted. Here, we assume that public albums are visible to everyone,
-    # and restricted albums are visible only if the current user is the owner or is in allowed_users.
+    # Return albums visible to the current user:
     rows = await db.fetch("""
         SELECT * FROM albums
         WHERE permission = 'public'
@@ -146,3 +150,39 @@ async def list_albums(
            OR (permission = 'restricted' AND $1 = ANY(allowed_users))
     """, current_user)
     return [Album(**dict(row)) for row in rows]
+
+@router.post("/{album_id}/request-access", response_model=dict)
+async def request_album_access(
+    album_id: str,
+    db: asyncpg.Connection = Depends(get_db),
+    current_user: str = Depends(get_current_user_id),
+    auth_verified: bool = Depends(verify_rocketchat_auth)
+):
+    # Check if album exists
+    album = await db.fetchrow("SELECT * FROM albums WHERE album_id=$1", album_id)
+    if not album:
+        raise HTTPException(status_code=404, detail="Album not found")
+    
+    # Check if album is restricted
+    album_dict = dict(album)
+    if album_dict.get("permission") != "restricted":
+        raise HTTPException(status_code=400, detail="Access request is only applicable for restricted albums")
+    
+    # Option 1: Insert a record into an access_requests table (preferred for tracking)
+    # Option 2: Or update the album record to mark that a request has been made.
+    # For demonstration, we assume Option 1.
+    try:
+        await db.execute(
+            """
+            INSERT INTO album_access_requests (request_id, album_id, requester_id, status)
+            VALUES ($1, $2, $3, $4)
+            """,
+            str(uuid.uuid4()),
+            album_id,
+            current_user,
+            "pending"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating access request: {e}")
+    
+    return {"status": "success", "message": "Access request submitted"}
