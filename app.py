@@ -55,3 +55,4 @@ async def shutdown():
 # Include routers with the desired prefixes
 app.include_router(location_router, prefix="/api")
 app.include_router(profile_router, prefix="/api/profile")
+app.include_router(interest_router, prefix="/api/interests")
