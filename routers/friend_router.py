@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel
-from dependencies import get_current_user, get_profile_by_id
+from dependencies import get_current_user_id, get_profile_by_id
 import uuid
 import math
 import enum
@@ -15,6 +15,13 @@ class FriendshipStatus(str, enum.Enum):
     REJECTED = "rejected"
 
 
+class ProfileModel(BaseModel):
+    userId: str
+    username: str
+    name: str
+    avatarURL: Optional[str] = None
+
+
 class FriendRequest(BaseModel):
     id: str
     sender_id: str
@@ -22,7 +29,7 @@ class FriendRequest(BaseModel):
     status: FriendshipStatus
     created_at: datetime
     updated_at: Optional[datetime] = None
-    sender_profile: Optional[CoreProfile] = None
+    sender_profile: Optional[ProfileModel] = None
 
 
 class Friend(BaseModel):
@@ -30,7 +37,7 @@ class Friend(BaseModel):
     user_id: str
     friendship_id: str
     created_at: datetime
-    profile: Optional[CoreProfile] = None
+    profile: Optional[ProfileModel] = None
     distance: Optional[float] = None
     last_active: Optional[datetime] = None
 
@@ -45,7 +52,7 @@ router = APIRouter(
 async def send_friend_request(
     request: Request,
     data: Dict[str, Any],
-    current_user: dict = Depends(get_current_user)
+    current_user_id: str = Depends(get_current_user_id)
 ):
     """Send a friend request to another user"""
     receiver_id = data.get("receiverId")
@@ -53,7 +60,7 @@ async def send_friend_request(
         raise HTTPException(status_code=400, detail="Receiver ID is required")
     
     # Check if users are the same
-    if current_user["userId"] == receiver_id:
+    if current_user_id == receiver_id:
         raise HTTPException(status_code=400, detail="Cannot send friend request to yourself")
     
     # Check if receiver exists
@@ -69,7 +76,7 @@ async def send_friend_request(
             SELECT * FROM friendship_requests 
             WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)
             AND status = 'pending'
-        ''', current_user["userId"], receiver_id)
+        ''', current_user_id, receiver_id)
         
         if existing_request:
             raise HTTPException(status_code=400, detail="A pending friend request already exists between these users")
@@ -78,7 +85,7 @@ async def send_friend_request(
         existing_friendship = await conn.fetchrow('''
             SELECT * FROM friendships 
             WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
-        ''', current_user["userId"], receiver_id)
+        ''', current_user_id, receiver_id)
         
         if existing_friendship:
             raise HTTPException(status_code=400, detail="These users are already friends")
@@ -88,20 +95,20 @@ async def send_friend_request(
         await conn.execute('''
             INSERT INTO friendship_requests (request_id, sender_id, receiver_id, status, created_at)
             VALUES ($1, $2, $3, $4, $5)
-        ''', request_id, current_user["userId"], receiver_id, 'pending', datetime.utcnow())
+        ''', request_id, current_user_id, receiver_id, 'pending', datetime.utcnow())
         
         # Get sender profile to return
-        current_user_profile = await get_profile_by_id(current_user["userId"], request.app.state.db_pool)
+        current_user_profile = await get_profile_by_id(current_user_id, request.app.state.db_pool)
         
         # Prepare response
         response = {
             "id": request_id,
-            "senderId": current_user["userId"],
+            "senderId": current_user_id,
             "receiverId": receiver_id,
             "status": "pending",
             "createdAt": datetime.utcnow(),
             "senderProfile": {
-                "userId": current_user["userId"],
+                "userId": current_user_id,
                 "username": current_user_profile.get("username"),
                 "name": current_user_profile.get("name"),
                 "avatarURL": current_user_profile.get("avatar")
@@ -115,7 +122,7 @@ async def send_friend_request(
 async def accept_friend_request(
     request: Request,
     data: Dict[str, Any],
-    current_user: dict = Depends(get_current_user)
+    current_user_id: str = Depends(get_current_user_id)
 ):
     """Accept a friend request"""
     request_id = data.get("requestId")
@@ -127,7 +134,7 @@ async def accept_friend_request(
         friend_request = await conn.fetchrow('''
             SELECT * FROM friendship_requests
             WHERE request_id = $1 AND receiver_id = $2 AND status = 'pending'
-        ''', request_id, current_user["userId"])
+        ''', request_id, current_user_id)
         
         if not friend_request:
             raise HTTPException(status_code=404, detail="Friend request not found or you're not authorized to accept it")
@@ -179,7 +186,7 @@ async def accept_friend_request(
 async def reject_friend_request(
     request: Request,
     data: Dict[str, Any],
-    current_user: dict = Depends(get_current_user)
+    current_user_id: str = Depends(get_current_user_id)
 ):
     """Reject a friend request"""
     request_id = data.get("requestId")
@@ -191,7 +198,7 @@ async def reject_friend_request(
         friend_request = await conn.fetchrow('''
             SELECT * FROM friendship_requests
             WHERE request_id = $1 AND receiver_id = $2 AND status = 'pending'
-        ''', request_id, current_user["userId"])
+        ''', request_id, current_user_id)
         
         if not friend_request:
             raise HTTPException(status_code=404, detail="Friend request not found or you're not authorized to reject it")
@@ -210,7 +217,7 @@ async def reject_friend_request(
 async def remove_friend(
     request: Request,
     data: Dict[str, Any],
-    current_user: dict = Depends(get_current_user)
+    current_user_id: str = Depends(get_current_user_id)
 ):
     """Remove a friend"""
     friend_id = data.get("friendId")
@@ -222,7 +229,7 @@ async def remove_friend(
         friendship = await conn.fetchrow('''
             SELECT * FROM friendships
             WHERE friendship_id = $1 AND (user1_id = $2 OR user2_id = $2)
-        ''', friend_id, current_user["userId"])
+        ''', friend_id, current_user_id)
         
         if not friendship:
             raise HTTPException(status_code=404, detail="Friendship not found or you're not authorized to remove it")
@@ -239,7 +246,7 @@ async def remove_friend(
 @router.get("")
 async def get_friends(
     request: Request,
-    current_user: dict = Depends(get_current_user)
+    current_user_id: str = Depends(get_current_user_id)
 ):
     """Get all friends for the current user"""
     async with request.app.state.db_pool.acquire() as conn:
@@ -247,13 +254,13 @@ async def get_friends(
         friendships = await conn.fetch('''
             SELECT * FROM friendships
             WHERE user1_id = $1 OR user2_id = $1
-        ''', current_user["userId"])
+        ''', current_user_id)
         
         # Get current user's location if available
         current_user_location = await conn.fetchrow('''
             SELECT * FROM user_locations
             WHERE user_id = $1
-        ''', current_user["userId"])
+        ''', current_user_id)
         
         # Decrypt current user's location
         current_user_coords = None
@@ -265,7 +272,7 @@ async def get_friends(
         friends_list = []
         for friendship in friendships:
             # Determine which user is the friend
-            friend_id = friendship["user2_id"] if friendship["user1_id"] == current_user["userId"] else friendship["user1_id"]
+            friend_id = friendship["user2_id"] if friendship["user1_id"] == current_user_id else friendship["user1_id"]
             
             # Get friend's profile
             friend_profile = await get_profile_by_id(friend_id, request.app.state.db_pool)
@@ -319,7 +326,7 @@ async def get_friends(
 @router.get("/requests")
 async def get_friend_requests(
     request: Request,
-    current_user: dict = Depends(get_current_user)
+    current_user_id: str = Depends(get_current_user_id)
 ):
     """Get pending friend requests for the current user"""
     async with request.app.state.db_pool.acquire() as conn:
@@ -327,7 +334,7 @@ async def get_friend_requests(
         requests = await conn.fetch('''
             SELECT * FROM friendship_requests
             WHERE receiver_id = $1 AND status = 'pending'
-        ''', current_user["userId"])
+        ''', current_user_id)
         
         result = []
         for req in requests:

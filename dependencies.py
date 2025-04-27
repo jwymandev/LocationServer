@@ -62,3 +62,18 @@ async def get_current_user_id(request: Request):
     # We can add additional validation here if needed
     
     return user_id
+
+async def get_profile_by_id(user_id: str, pool):
+    """Get a user profile by ID."""
+    async with pool.acquire() as conn:
+        profile = await conn.fetchrow('''
+            SELECT * FROM profiles WHERE user_id = $1
+        ''', user_id)
+        
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Profile for user {user_id} not found"
+            )
+        
+        return dict(profile)

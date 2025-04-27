@@ -163,3 +163,48 @@ async def find_nearest_users(
             "time_window": time_window
         }
     }
+    
+@router.get("/user_location")
+async def get_user_location(
+    userId: str,
+    api_key: str = Depends(verify_api_key),
+    auth_verified: bool = Depends(verify_rocketchat_auth),
+    db: asyncpg.Connection = Depends(get_db)
+):
+    """Get a specific user's location data."""
+    user_location = await db.fetchrow('''
+        SELECT user_id, encrypted_data, timestamp, visibility FROM user_locations 
+        WHERE user_id = $1
+          AND timestamp > NOW() - INTERVAL '7 days'
+    ''', userId)
+    
+    if not user_location:
+        raise HTTPException(status_code=404, detail=f"Location for user {userId} not found or is older than 7 days")
+    
+    # Only return decrypted location if the user's location is not private
+    if user_location['visibility'] != 'private':
+        try:
+            lat, lon = decrypt_location(user_location['encrypted_data'])
+            
+            return {
+                "status": "success",
+                "data": {
+                    "userId": user_location['user_id'],
+                    "latitude": lat,
+                    "longitude": lon,
+                    "lastActive": user_location['timestamp'],
+                    "visibility": user_location['visibility']
+                }
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error decrypting location: {str(e)}")
+    else:
+        # If location is private, only return non-coordinate data
+        return {
+            "status": "success",
+            "data": {
+                "userId": user_location['user_id'],
+                "lastActive": user_location['timestamp'],
+                "visibility": user_location['visibility']
+            }
+        }
