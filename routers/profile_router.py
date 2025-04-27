@@ -21,7 +21,7 @@ async def get_profile(
     row = await db.fetchrow("SELECT * FROM profiles WHERE user_id=$1", user_id)
     
     if row is None:
-        # Return a default profile instead of 404
+        # Create a default profile in the database instead of just returning a temporary one
         core = CoreProfile(
             user_id=user_id,
             username="DefaultUsername",
@@ -34,9 +34,54 @@ async def get_profile(
             description=None,
             interests=None
         )
-        return CombinedProfile(coreProfile=core, extendedProfile=ext)
+        
+        # Create a default profile in the database
+        combined = CombinedProfile(coreProfile=core, extendedProfile=ext)
+        
+        # Insert the default profile
+        try:
+            query = """
+            INSERT INTO profiles (user_id, username, name, avatar, birthday, hometown, description, interests)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *;
+            """
+            
+            row = await db.fetchrow(
+                query,
+                user_id,
+                "DefaultUsername",
+                "Default Name",
+                None,
+                "1970-01-01",
+                None,
+                None,
+                None
+            )
+            
+            if row is None:
+                print(f"Failed to create default profile for user {user_id}")
+                # Even if DB insert fails, still return something
+                return {
+                    "status": "success",
+                    "data": combined,
+                    "message": "Temporary profile. Please update your profile."
+                }
+            
+            # Successfully created profile
+            profile_dict = dict(row)
+            
+        except Exception as e:
+            print(f"Error creating default profile: {str(e)}")
+            # Return the default profile even if DB operation failed
+            return {
+                "status": "success",
+                "data": combined,
+                "message": "Temporary profile. Please update your profile."
+            }
+    else:
+        # Profile already exists
+        profile_dict = dict(row)
     
-    profile_dict = dict(row)
     default_birthday = "1970-01-01"
     
     core = CoreProfile(

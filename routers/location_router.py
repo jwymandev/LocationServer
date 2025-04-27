@@ -26,18 +26,55 @@ async def update_location(
     """Update a user's location with encryption."""
     encrypted_data = encrypt_location(location.latitude, location.longitude)
     
-    await db.execute('''
-        INSERT INTO user_locations (user_id, encrypted_data, visibility, timestamp)
-        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-        ON CONFLICT (user_id) 
-        DO UPDATE SET encrypted_data = $2, visibility = $3, timestamp = CURRENT_TIMESTAMP
-    ''', location.user_id, encrypted_data, location.visibility)
+    # First, check if user has a profile
+    profile_exists = await db.fetchval(
+        "SELECT EXISTS(SELECT 1 FROM profiles WHERE user_id = $1)",
+        location.user_id
+    )
     
-    return {
-        "status": "success",
-        "message": "Location updated",
-        "data": {}
-    }
+    # If no profile exists, create a default one
+    if not profile_exists:
+        try:
+            print(f"Creating default profile for user {location.user_id} before updating location")
+            
+            await db.execute("""
+                INSERT INTO profiles (user_id, username, name, avatar, birthday, hometown, description, interests)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            """, 
+            location.user_id, 
+            "DefaultUsername", 
+            "Default Name", 
+            None, 
+            "1970-01-01", 
+            None, 
+            None, 
+            None)
+            
+        except Exception as e:
+            print(f"Failed to create default profile for user {location.user_id}: {str(e)}")
+            # We continue anyway to try updating the location
+    
+    # Now update the location
+    try:
+        await db.execute('''
+            INSERT INTO user_locations (user_id, encrypted_data, visibility, timestamp)
+            VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id) 
+            DO UPDATE SET encrypted_data = $2, visibility = $3, timestamp = CURRENT_TIMESTAMP
+        ''', location.user_id, encrypted_data, location.visibility)
+        
+        return {
+            "status": "success",
+            "message": "Location updated",
+            "data": {}
+        }
+    except Exception as e:
+        print(f"Error updating location for user {location.user_id}: {str(e)}")
+        return {
+            "status": "error",
+            "message": "Failed to update location. Please try again later.",
+            "data": {}
+        }
 
 @router.post("/nearby_by_coordinates")
 async def find_nearest_users_by_coords(

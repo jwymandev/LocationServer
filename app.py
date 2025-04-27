@@ -33,10 +33,10 @@ async def init_db(pool):
         await conn.execute('''
         CREATE TABLE IF NOT EXISTS user_locations (
             user_id TEXT PRIMARY KEY,
-            latitude DOUBLE PRECISION NOT NULL,
-            longitude DOUBLE PRECISION NOT NULL,
+            encrypted_data BYTEA NOT NULL,
             visibility TEXT NOT NULL,
-            last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES profiles(user_id) ON DELETE CASCADE,
             CONSTRAINT valid_visibility CHECK (visibility IN ('public', 'hidden', 'private'))
         );
         ''')
@@ -54,7 +54,7 @@ async def init_db(pool):
             );
         ''')
 
-        await conn.exectute('''
+        await conn.execute('''
             CREATE TABLE IF NOT EXISTS album_access_requests (
                 request_id TEXT PRIMARY KEY,
                 album_id TEXT NOT NULL,
@@ -63,17 +63,16 @@ async def init_db(pool):
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (album_id) REFERENCES albums(album_id) ON DELETE CASCADE
             );
-                            ''')
+        ''')
         
-        await conn.exectute('''
+        await conn.execute('''
             CREATE TABLE IF NOT EXISTS blocked_users (
                 blocker_id TEXT NOT NULL,
                 blocked_id TEXT NOT NULL,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (blocker_id, blocked_id)
             );
-            
-                            ''')
+        ''')
         
 
 @app.on_event("startup")

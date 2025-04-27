@@ -9,8 +9,8 @@ async def get_interests():
     # For now, we use hardcoded data. Later, you can load from the database or another source.
     interests = [
         InterestConfig(category="kinks", interest="Bondage", active=False),
-        InterestConfig(category="kinks", interest="Domination", active=False),
-        InterestConfig(category="kinks", interest="Submission", active=False),
+        InterestConfig(category="kinks", interest="Dom", active=False),
+        InterestConfig(category="kinks", interest="Subm", active=False),
         InterestConfig(category="interests", interest="Music", active=True),
         InterestConfig(category="interests", interest="Travel", active=True),
         InterestConfig(category="lifestyle", interest="Adventurous", active=True),
