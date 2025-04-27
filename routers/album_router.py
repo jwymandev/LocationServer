@@ -71,14 +71,15 @@ async def update_album(
         row = await db.fetchrow(
             """
             UPDATE albums
-            SET title=$1, description=$2, images=$3::jsonb, public=$4
-            WHERE album_id=$5
+            SET title=$1, description=$2, images=$3::jsonb, permission=$4, allowed_users=$5::jsonb
+            WHERE album_id=$6
             RETURNING *
             """,
             album.title,
             album.description,
             json.dumps(album.images),
-            album.public,
+            album.permission,
+            json.dumps(album.allowed_users) if album.allowed_users else None,
             album_id
         )
     except Exception as e:
@@ -132,7 +133,7 @@ async def list_albums(
     auth_verified: bool = Depends(verify_rocketchat_auth)  # Optionally verify auth
 ):
     # Return only public albums for now.
-    rows = await db.fetch("SELECT * FROM albums WHERE public = TRUE")
+    rows = await db.fetch("SELECT * FROM albums WHERE permission = 'public'")
     return [Album(**dict(row)) for row in rows]
 
 

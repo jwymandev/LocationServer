@@ -48,3 +48,17 @@ async def verify_rocketchat_auth(request: Request):
         )
         
     return True
+
+async def get_current_user_id(request: Request):
+    """Get current user ID from the X-User-Id header."""
+    user_id = request.headers.get("X-User-Id")
+    
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing X-User-Id header"
+        )
+        
+    # We can add additional validation here if needed
+    
+    return user_id

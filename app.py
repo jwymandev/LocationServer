@@ -49,8 +49,10 @@ async def init_db(pool):
                 title TEXT NOT NULL,
                 description TEXT,
                 images JSONB,
-                public BOOLEAN NOT NULL DEFAULT FALSE,
-                FOREIGN KEY (user_id) REFERENCES profiles(user_id) ON DELETE CASCADE
+                permission TEXT NOT NULL DEFAULT 'private',
+                allowed_users JSONB,
+                FOREIGN KEY (user_id) REFERENCES profiles(user_id) ON DELETE CASCADE,
+                CONSTRAINT valid_permission CHECK (permission IN ('public', 'private', 'restricted'))
             );
         ''')
 
