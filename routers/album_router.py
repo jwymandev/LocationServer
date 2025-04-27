@@ -1,12 +1,25 @@
 import json
 import uuid
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import List
 from models.album_model import Album
-from dependencies import get_db, get_current_user_id, verify_rocketchat_auth  # Added verify_rocketchat_auth
+from dependencies import get_db, verify_rocketchat_auth, verify_api_key
 import asyncpg
 
 router = APIRouter()
+
+# Define get_current_user_id locally since it's not available in dependencies
+async def get_current_user_id(request: Request):
+    """Get current user ID from the X-User-Id header."""
+    user_id = request.headers.get("X-User-Id")
+    
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing X-User-Id header"
+        )
+    
+    return user_id
 
 @router.post("/", response_model=Album)
 async def create_album(

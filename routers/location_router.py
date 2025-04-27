@@ -26,7 +26,7 @@ async def update_location(
     """Update a user's location with encryption."""
     encrypted_data = encrypt_location(location.latitude, location.longitude)
     
-    await db.execute(''' on the cl
+    await db.execute('''
         INSERT INTO user_locations (user_id, encrypted_data, visibility, timestamp)
         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
         ON CONFLICT (user_id) 
