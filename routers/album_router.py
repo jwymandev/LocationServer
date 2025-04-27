@@ -211,6 +211,22 @@ async def add_photo_to_album(
     if existing["user_id"] != current_user:
         raise HTTPException(status_code=403, detail="Not authorized to add photos to this album")
     
+    # Get current photos
+    current_photos = []
+    if existing.get("photos"):
+        if isinstance(existing["photos"], str):
+            current_photos = json.loads(existing["photos"])
+        else:
+            current_photos = existing["photos"]
+    
+    # Check if this is a profile album and enforce the 6 photo limit
+    is_profile_album = existing.get("is_profile_album", False)
+    if is_profile_album and len(current_photos) >= 6:
+        raise HTTPException(
+            status_code=400, 
+            detail="Profile albums are limited to 6 photos. Please delete a photo before adding a new one."
+        )
+    
     # Create a new photo item
     photo_id = str(uuid.uuid4())
     new_photo = PhotoItem(
@@ -220,14 +236,6 @@ async def add_photo_to_album(
         caption=caption,
         timestamp=datetime.datetime.now().isoformat()
     )
-    
-    # Get current photos
-    current_photos = []
-    if existing.get("photos"):
-        if isinstance(existing["photos"], str):
-            current_photos = json.loads(existing["photos"])
-        else:
-            current_photos = existing["photos"]
     
     # Add the new photo
     current_photos.append(new_photo.dict())

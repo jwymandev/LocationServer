@@ -8,6 +8,7 @@ from routers.profile_router import router as profile_router
 from routers.interest_router import router as interest_router
 from routers.album_router import router as album_router
 from routers.blocked_router import router as blocked_router
+from routers.friend_router import router as friend_router
 from config import get_db_config, get_ssl_context
 
 app = FastAPI()
@@ -77,6 +78,34 @@ async def init_db(pool):
             );
         ''')
         
+        # Create friendship request table
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS friendship_requests (
+                request_id TEXT PRIMARY KEY,
+                sender_id TEXT NOT NULL,
+                receiver_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE,
+                FOREIGN KEY (sender_id) REFERENCES profiles(user_id) ON DELETE CASCADE,
+                FOREIGN KEY (receiver_id) REFERENCES profiles(user_id) ON DELETE CASCADE,
+                CONSTRAINT valid_status CHECK (status IN ('pending', 'accepted', 'rejected'))
+            );
+        ''')
+        
+        # Create friendships table
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS friendships (
+                friendship_id TEXT PRIMARY KEY,
+                user1_id TEXT NOT NULL,
+                user2_id TEXT NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user1_id) REFERENCES profiles(user_id) ON DELETE CASCADE,
+                FOREIGN KEY (user2_id) REFERENCES profiles(user_id) ON DELETE CASCADE,
+                CONSTRAINT unique_friendship UNIQUE (user1_id, user2_id)
+            );
+        ''')
+        
 
 @app.on_event("startup")
 async def startup():
@@ -98,3 +127,4 @@ app.include_router(profile_router, prefix="/api/profile")
 app.include_router(interest_router, prefix="/api/interests")
 app.include_router(album_router, prefix="/api/albums")
 app.include_router(blocked_router, prefix="/api/blocked")
+app.include_router(friend_router, prefix="/api/friends")
