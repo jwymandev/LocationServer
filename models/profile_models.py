@@ -38,3 +38,4 @@ class CoreProfile(BaseModel):
 class CombinedProfile(BaseModel):
     coreProfile: CoreProfile
     extendedProfile: ExtendedProfile
+    profileAlbumId: Optional[str] = None

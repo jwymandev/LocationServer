@@ -70,6 +70,10 @@ async def get_profile(
             # Successfully created profile
             profile_dict = dict(row)
             
+            # Create a default profile album for the user
+            from routers.album_router import ensure_profile_album_exists
+            await ensure_profile_album_exists(user_id, db)
+            
         except Exception as e:
             print(f"Error creating default profile: {str(e)}")
             # Return the default profile even if DB operation failed
@@ -81,6 +85,10 @@ async def get_profile(
     else:
         # Profile already exists
         profile_dict = dict(row)
+        
+        # Ensure profile album exists
+        from routers.album_router import ensure_profile_album_exists
+        await ensure_profile_album_exists(user_id, db)
     
     default_birthday = "1970-01-01"
     
@@ -97,7 +105,23 @@ async def get_profile(
         description=profile_dict.get("description"),
         interests=profile_dict.get("interests")
     )
-    combined = CombinedProfile(coreProfile=core, extendedProfile=ext)   
+    combined = CombinedProfile(coreProfile=core, extendedProfile=ext)
+
+    # Get profile album information
+    try:
+        album_row = await db.fetchrow(
+            "SELECT * FROM albums WHERE user_id = $1 AND is_profile_album = TRUE", 
+            user_id
+        )
+        
+        if album_row:
+            album_dict = dict(album_row)
+            album_id = album_dict.get("album_id")
+            
+            # Include album ID in the response
+            combined.profileAlbumId = album_id
+    except Exception as e:
+        print(f"Error getting profile album: {str(e)}")
 
     return {
         "status": "success",
