@@ -187,7 +187,7 @@ async def get_profile(
 @router.put("/{user_id}", response_model=ProfileResponse)
 async def update_profile(
     user_id: str = Path(..., description="The user ID to update the profile for"),
-    profile: CombinedProfile = None,
+    profile_data: dict = None,
     api_key: str = Depends(verify_api_key),
     auth_verified: bool = Depends(verify_rocketchat_auth),
     db: asyncpg.Connection = Depends(get_db)
@@ -195,19 +195,89 @@ async def update_profile(
     """
     Update a user's profile.
     
-    The user ID in the path must match the user ID in the profile.
+    Accepts either a full CombinedProfile object or just the fields to update.
+    The user ID in the path is used to identify the profile.
     """
-    if not profile:
+    logger.info(f"Received profile update for user {user_id}: {profile_data}")
+    
+    if not profile_data:
         raise HTTPException(status_code=400, detail="Profile data is required")
         
-    if user_id != profile.coreProfile.user_id:
-        raise HTTPException(status_code=400, detail="User ID in path must match user ID in profile")
+    # Get existing profile to update
+    try:
+        existing_row = await db.fetchrow("SELECT * FROM profiles WHERE user_id=$1", user_id)
+        if not existing_row:
+            logger.warning(f"No existing profile found for user {user_id}, will create new profile")
+    except Exception as e:
+        logger.error(f"Error fetching profile for update: {str(e)}")
+        existing_row = None
+    
+    # Determine if we're receiving a full CombinedProfile or just fields to update
+    if "coreProfile" in profile_data:
+        # Full CombinedProfile format
+        profile = CombinedProfile(**profile_data)
+        if user_id != profile.coreProfile.user_id:
+            raise HTTPException(status_code=400, detail="User ID in path must match user ID in profile")
+            
+        core_profile = profile.coreProfile
+        ext_profile = profile.extendedProfile
+    else:
+        # Just fields to update - create profiles from existing data and updates
+        if existing_row:
+            existing_data = dict(existing_row)
+            
+            # Create core profile from existing data
+            core_profile = CoreProfile(
+                user_id=user_id,
+                username=existing_data.get("username", "DefaultUsername"),
+                name=existing_data.get("name", "Default Name"),
+                avatar=existing_data.get("avatar")
+            )
+            
+            # Parse existing interests
+            interests = existing_data.get("interests", [])
+            if isinstance(interests, str):
+                try:
+                    interests = json.loads(interests)
+                except json.JSONDecodeError:
+                    logger.warning(f"Failed to parse interests JSON, defaulting to empty list")
+                    interests = []
+                    
+            # Create extended profile by merging existing data with updates
+            ext_profile = ExtendedProfile(
+                birthday=existing_data.get("birthday"),
+                hometown=existing_data.get("hometown"),
+                description=existing_data.get("description"),
+                interests=interests,
+                height=existing_data.get("height"),
+                weight=existing_data.get("weight"),
+                position=existing_data.get("position")
+            )
+            
+            # Update with new values
+            for field, value in profile_data.items():
+                if hasattr(ext_profile, field):
+                    setattr(ext_profile, field, value)
+        else:
+            # No existing profile, create minimal versions
+            core_profile = CoreProfile(
+                user_id=user_id,
+                username="DefaultUsername",
+                name="Default Name",
+                avatar=None
+            )
+            
+            # Initialize extended profile with provided data
+            ext_profile = ExtendedProfile()
+            for field, value in profile_data.items():
+                if hasattr(ext_profile, field):
+                    setattr(ext_profile, field, value)
     
     # Prepare interests data
     interests_json = "[]"
-    if profile.extendedProfile and profile.extendedProfile.interests is not None:
+    if ext_profile and ext_profile.interests is not None:
         try:
-            interests_json = json.dumps(profile.extendedProfile.interests)
+            interests_json = json.dumps(ext_profile.interests)
         except Exception as e:
             logger.error(f"Failed to encode interests for user {user_id}: {str(e)}")
             raise HTTPException(status_code=400, detail=f"Failed to encode interests: {str(e)}")
@@ -233,17 +303,17 @@ async def update_profile(
     try:
         row = await db.fetchrow(
             query,
-            profile.coreProfile.user_id,
-            profile.coreProfile.username,
-            profile.coreProfile.name,
-            profile.coreProfile.avatar,
-            profile.extendedProfile.birthday,
-            profile.extendedProfile.hometown,
-            profile.extendedProfile.description,
+            core_profile.user_id,
+            core_profile.username,
+            core_profile.name,
+            core_profile.avatar,
+            ext_profile.birthday,
+            ext_profile.hometown,
+            ext_profile.description,
             interests_json,
-            profile.extendedProfile.height,
-            profile.extendedProfile.weight,
-            profile.extendedProfile.position
+            ext_profile.height,
+            ext_profile.weight,
+            ext_profile.position
         )
         
         if row is None:
