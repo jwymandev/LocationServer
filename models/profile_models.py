@@ -14,6 +14,9 @@ class ExtendedProfile(BaseModel):
     hometown: Optional[str] = None
     description: Optional[str] = None
     interests: Optional[List[str]] = []
+    height: Optional[int] = None
+    weight: Optional[int] = None
+    position: Optional[str] = None
     
     class Config:
         json_encoders = {
@@ -98,7 +101,10 @@ class CombinedProfile(BaseModel):
                     "birthday": "1990-01-01",
                     "hometown": "New York",
                     "description": "Software engineer and outdoor enthusiast",
-                    "interests": ["hiking", "coding", "photography"]
+                    "interests": ["hiking", "coding", "photography"],
+                    "height": 180,
+                    "weight": 75,
+                    "position": "Versatile"
                 },
                 "profileAlbumId": "album123"
             }

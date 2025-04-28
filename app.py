@@ -43,9 +43,22 @@ async def init_db(pool):
             birthday DATE,
             hometown TEXT,
             description TEXT,
-            interests JSONB
+            interests JSONB,
+            height INTEGER,
+            weight INTEGER,
+            position TEXT
         );
         ''')
+        
+        # Alter table to add new columns if they don't exist
+        # This ensures backward compatibility for existing databases
+        try:
+            await conn.execute('ALTER TABLE profiles ADD COLUMN IF NOT EXISTS height INTEGER;')
+            await conn.execute('ALTER TABLE profiles ADD COLUMN IF NOT EXISTS weight INTEGER;')
+            await conn.execute('ALTER TABLE profiles ADD COLUMN IF NOT EXISTS position TEXT;')
+            print("Successfully added physical stats columns to profiles table if they didn't exist.")
+        except Exception as e:
+            print(f"Error adding columns to profiles table: {str(e)}")
         
         # Create locations table
         await conn.execute('''

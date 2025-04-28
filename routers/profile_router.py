@@ -51,7 +51,10 @@ async def get_profile(
                 birthday=None,
                 hometown=None,
                 description=None,
-                interests=[]
+                interests=[],
+                height=None,
+                weight=None,
+                position=None
             )
             
             # Create a default profile in the database
@@ -60,8 +63,8 @@ async def get_profile(
             # Insert the default profile
             try:
                 query = """
-                INSERT INTO profiles (user_id, username, name, avatar, birthday, hometown, description, interests)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                INSERT INTO profiles (user_id, username, name, avatar, birthday, hometown, description, interests, height, weight, position)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                 RETURNING *;
                 """
                 
@@ -74,7 +77,10 @@ async def get_profile(
                     None,
                     None,
                     None,
-                    json.dumps([])
+                    json.dumps([]),
+                    None,
+                    None,
+                    None
                 )
                 
                 if row is None:
@@ -133,7 +139,10 @@ async def get_profile(
             birthday=profile_dict.get("birthday"),
             hometown=profile_dict.get("hometown"),
             description=profile_dict.get("description"),
-            interests=interests
+            interests=interests,
+            height=profile_dict.get("height"),
+            weight=profile_dict.get("weight"),
+            position=profile_dict.get("position")
         )
         
         # Create combined profile
@@ -204,8 +213,8 @@ async def update_profile(
             raise HTTPException(status_code=400, detail=f"Failed to encode interests: {str(e)}")
     
     query = """
-    INSERT INTO profiles (user_id, username, name, avatar, birthday, hometown, description, interests)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    INSERT INTO profiles (user_id, username, name, avatar, birthday, hometown, description, interests, height, weight, position)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     ON CONFLICT (user_id)
     DO UPDATE SET
         username = EXCLUDED.username,
@@ -214,7 +223,10 @@ async def update_profile(
         birthday = EXCLUDED.birthday,
         hometown = EXCLUDED.hometown,
         description = EXCLUDED.description,
-        interests = EXCLUDED.interests
+        interests = EXCLUDED.interests,
+        height = EXCLUDED.height,
+        weight = EXCLUDED.weight,
+        position = EXCLUDED.position
     RETURNING *;
     """
     
@@ -228,7 +240,10 @@ async def update_profile(
             profile.extendedProfile.birthday,
             profile.extendedProfile.hometown,
             profile.extendedProfile.description,
-            interests_json
+            interests_json,
+            profile.extendedProfile.height,
+            profile.extendedProfile.weight,
+            profile.extendedProfile.position
         )
         
         if row is None:
@@ -257,7 +272,10 @@ async def update_profile(
             birthday=updated.get("birthday"),
             hometown=updated.get("hometown"),
             description=updated.get("description"),
-            interests=interests
+            interests=interests,
+            height=updated.get("height"),
+            weight=updated.get("weight"),
+            position=updated.get("position")
         )
         
         combined = CombinedProfile(coreProfile=core, extendedProfile=ext)
@@ -370,7 +388,10 @@ async def search_profiles(
                 birthday=profile_dict.get("birthday"),
                 hometown=profile_dict.get("hometown"),
                 description=profile_dict.get("description"),
-                interests=interests
+                interests=interests,
+                height=profile_dict.get("height"),
+                weight=profile_dict.get("weight"),
+                position=profile_dict.get("position")
             )
             
             combined = CombinedProfile(coreProfile=core, extendedProfile=ext)
