@@ -3,6 +3,8 @@ import os
 import asyncpg
 import ssl
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from routers.location_router import router as location_router
 from routers.profile_router import router as profile_router
 from routers.interest_router import router as interest_router
@@ -10,8 +12,22 @@ from routers.album_router import router as album_router
 from routers.blocked_router import router as blocked_router
 from routers.friend_router import router as friend_router
 from config import get_db_config, get_ssl_context
+from pathlib import Path
 
 app = FastAPI()
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Create uploads directory if it doesn't exist
+uploads_dir = Path("uploads")
+uploads_dir.mkdir(exist_ok=True, mode=0o755)
 
 async def init_db(pool):
     """Initialize database tables if they don't exist."""
@@ -128,3 +144,7 @@ app.include_router(interest_router, prefix="/api/interests")
 app.include_router(album_router, prefix="/api/albums")
 app.include_router(blocked_router, prefix="/api/blocked")
 app.include_router(friend_router, prefix="/api/friends")
+
+# Mount the uploads directory for static file serving
+# This must be done after all router registrations
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

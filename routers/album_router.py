@@ -1,11 +1,19 @@
 import json
 import uuid
 import datetime
+import os
+import shutil
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request, Form, File, UploadFile, Body
+from fastapi.responses import JSONResponse
 from typing import List, Optional
 from models.album_model import Album, PhotoItem
 from dependencies import get_db, verify_rocketchat_auth, verify_api_key
 import asyncpg
+
+# Create uploads directory if it doesn't exist
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True, mode=0o755)
 
 router = APIRouter()
 
@@ -588,3 +596,141 @@ async def request_album_access(
         raise HTTPException(status_code=500, detail=f"Error creating access request: {e}")
     
     return {"status": "success", "message": "Access request submitted"}
+
+@router.post("/upload", status_code=200)
+async def upload_photo(
+    file: UploadFile = File(...),
+    is_nsfw: bool = Form(False),
+    album_id: Optional[str] = Form(None),
+    caption: Optional[str] = Form(None),
+    db: asyncpg.Connection = Depends(get_db),
+    current_user: str = Depends(get_current_user_id),
+    auth_verified: bool = Depends(verify_rocketchat_auth)
+):
+    """
+    Upload a photo file to the server and optionally add it to an album.
+    
+    If album_id is provided, the photo will be added to that album.
+    If not, it will only be uploaded and the URL returned.
+    """
+    # Validate file type
+    content_type = file.content_type
+    if not content_type or not content_type.startswith('image/'):
+        raise HTTPException(
+            status_code=400, 
+            detail="File must be an image (JPEG, PNG, etc.)"
+        )
+    
+    # Get file extension from content type
+    extension = content_type.split('/')[1]
+    if extension == 'jpeg':
+        extension = 'jpg'
+    
+    # Create user-specific directory
+    user_dir = UPLOAD_DIR / current_user
+    user_dir.mkdir(exist_ok=True, mode=0o755)
+    
+    # Generate unique filename
+    filename = f"{uuid.uuid4()}.{extension}"
+    file_path = user_dir / filename
+    
+    # Write the file
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error saving file: {e}")
+    finally:
+        file.file.close()
+    
+    # Generate URL for the file
+    # This needs to be adjusted based on your server's domain and URL structure
+    base_url = os.environ.get('API_BASE_URL', 'http://localhost:8000')
+    file_url = f"{base_url}/uploads/{current_user}/{filename}"
+    
+    # If album_id is provided, add the photo to that album
+    album_response = None
+    if album_id:
+        # First, verify that the album exists and belongs to the user
+        album = await db.fetchrow("SELECT * FROM albums WHERE album_id=$1", album_id)
+        if not album:
+            raise HTTPException(status_code=404, detail="Album not found")
+        
+        if album["user_id"] != current_user:
+            raise HTTPException(status_code=403, detail="Not authorized to add photos to this album")
+        
+        # Get current photos
+        current_photos = []
+        if album.get("photos"):
+            if isinstance(album["photos"], str):
+                current_photos = json.loads(album["photos"])
+            else:
+                current_photos = album["photos"]
+        
+        # Check profile album photo limit
+        is_profile_album = album.get("is_profile_album", False)
+        if is_profile_album and len(current_photos) >= 6:
+            raise HTTPException(
+                status_code=400, 
+                detail="Profile albums are limited to 6 photos. Please delete a photo before adding a new one."
+            )
+        
+        # Create a new photo item
+        photo_id = str(uuid.uuid4())
+        new_photo = PhotoItem(
+            photo_id=photo_id,
+            url=file_url,
+            is_nsfw=is_nsfw,
+            caption=caption,
+            timestamp=datetime.datetime.now().isoformat()
+        )
+        
+        # Add the new photo
+        current_photos.append(new_photo.dict())
+        
+        # Update the album
+        try:
+            row = await db.fetchrow(
+                """
+                UPDATE albums
+                SET photos=$1::jsonb
+                WHERE album_id=$2
+                RETURNING *
+                """,
+                json.dumps(current_photos),
+                album_id
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Database error: {e}")
+        
+        if row is None:
+            raise HTTPException(status_code=500, detail="Failed to add photo to album")
+        
+        album_dict = dict(row)
+        # Convert the JSON string to a list of PhotoItem objects
+        if album_dict.get("photos"):
+            if isinstance(album_dict["photos"], str):
+                photos_data = json.loads(album_dict["photos"])
+            else:
+                photos_data = album_dict["photos"]
+                
+            album_dict["photos"] = [PhotoItem(**photo) for photo in photos_data]
+        else:
+            album_dict["photos"] = []
+        
+        album_response = Album(**album_dict)
+    
+    # Return response
+    if album_response:
+        return {
+            "status": "success",
+            "message": "Photo uploaded and added to album",
+            "url": file_url,
+            "album": album_response
+        }
+    else:
+        return {
+            "status": "success",
+            "message": "Photo uploaded",
+            "url": file_url
+        }
