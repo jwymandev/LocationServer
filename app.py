@@ -11,6 +11,7 @@ from routers.interest_router import router as interest_router
 from routers.album_router import router as album_router
 from routers.blocked_router import router as blocked_router
 from routers.friend_router import router as friend_router
+from routers.favorite_router import router as favorite_router
 from config import get_db_config, get_ssl_context
 from pathlib import Path
 
@@ -122,6 +123,19 @@ async def init_db(pool):
             );
         ''')
         
+        # Create favorites table
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS user_favorites (
+                favorite_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                favorite_user_id TEXT NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES profiles(user_id) ON DELETE CASCADE,
+                FOREIGN KEY (favorite_user_id) REFERENCES profiles(user_id) ON DELETE CASCADE,
+                CONSTRAINT unique_favorite UNIQUE (user_id, favorite_user_id)
+            );
+        ''')
+        
 
 @app.on_event("startup")
 async def startup():
@@ -144,6 +158,7 @@ app.include_router(interest_router, prefix="/api/interests")
 app.include_router(album_router, prefix="/api/albums")
 app.include_router(blocked_router, prefix="/api/blocked")
 app.include_router(friend_router, prefix="/api/friends")
+app.include_router(favorite_router, prefix="/api/favorites")
 
 # Mount the uploads directory for static file serving
 # This must be done after all router registrations
