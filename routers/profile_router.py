@@ -301,13 +301,32 @@ async def update_profile(
     """
     
     try:
+        # Handle birthday date format conversion
+        birthday_value = None
+        if ext_profile.birthday:
+            try:
+                # If it's already a date object, use it directly
+                from datetime import date
+                if isinstance(ext_profile.birthday, (date, datetime)):
+                    birthday_value = ext_profile.birthday
+                else:
+                    # Try to parse the string to a date
+                    from dateutil import parser
+                    birthday_value = parser.parse(ext_profile.birthday).date()
+            except Exception as e:
+                logger.error(f"Error parsing birthday: {str(e)}")
+                # Just use None if there's an error
+                birthday_value = None
+                
+        logger.info(f"Prepared query parameters: user_id={core_profile.user_id}, birthday={birthday_value}, height={ext_profile.height}, weight={ext_profile.weight}, position={ext_profile.position}")
+                
         row = await db.fetchrow(
             query,
             core_profile.user_id,
             core_profile.username,
             core_profile.name,
             core_profile.avatar,
-            ext_profile.birthday,
+            birthday_value,
             ext_profile.hometown,
             ext_profile.description,
             interests_json,
@@ -338,8 +357,18 @@ async def update_profile(
             avatar=updated.get("avatar")
         )
         
+        # Get birthday value
+        birthday_value = updated.get("birthday")
+        if isinstance(birthday_value, str):
+            try:
+                # If it's a string, try to parse it properly for client usage
+                from dateutil import parser
+                birthday_value = parser.parse(birthday_value).isoformat().split('T')[0]
+            except Exception as e:
+                logger.error(f"Error parsing birthday string: {str(e)}")
+                
         ext = ExtendedProfile(
-            birthday=updated.get("birthday"),
+            birthday=birthday_value,
             hometown=updated.get("hometown"),
             description=updated.get("description"),
             interests=interests,
