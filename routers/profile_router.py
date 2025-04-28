@@ -142,7 +142,11 @@ async def get_profile(
             interests=interests,
             height=profile_dict.get("height"),
             weight=profile_dict.get("weight"),
-            position=profile_dict.get("position")
+            position=profile_dict.get("position"),
+            showAge=profile_dict.get("showAge", True),
+            showHeight=profile_dict.get("showHeight", True),
+            showWeight=profile_dict.get("showWeight", True),
+            showPosition=profile_dict.get("showPosition", True)
         )
         
         # Create combined profile
@@ -283,8 +287,11 @@ async def update_profile(
             raise HTTPException(status_code=400, detail=f"Failed to encode interests: {str(e)}")
     
     query = """
-    INSERT INTO profiles (user_id, username, name, avatar, birthday, hometown, description, interests, height, weight, position)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    INSERT INTO profiles (
+        user_id, username, name, avatar, birthday, hometown, description, interests, 
+        height, weight, position, showAge, showHeight, showWeight, showPosition
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
     ON CONFLICT (user_id)
     DO UPDATE SET
         username = EXCLUDED.username,
@@ -296,7 +303,11 @@ async def update_profile(
         interests = EXCLUDED.interests,
         height = EXCLUDED.height,
         weight = EXCLUDED.weight,
-        position = EXCLUDED.position
+        position = EXCLUDED.position,
+        showAge = EXCLUDED.showAge,
+        showHeight = EXCLUDED.showHeight,
+        showWeight = EXCLUDED.showWeight,
+        showPosition = EXCLUDED.showPosition
     RETURNING *;
     """
     
@@ -332,7 +343,11 @@ async def update_profile(
             interests_json,
             ext_profile.height,
             ext_profile.weight,
-            ext_profile.position
+            ext_profile.position,
+            ext_profile.showAge,
+            ext_profile.showHeight,
+            ext_profile.showWeight,
+            ext_profile.showPosition
         )
         
         if row is None:

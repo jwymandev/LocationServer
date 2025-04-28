@@ -14,9 +14,15 @@ class ExtendedProfile(BaseModel):
     hometown: Optional[str] = None
     description: Optional[str] = None
     interests: Optional[List[str]] = []
+    # Physical stats
     height: Optional[int] = None
     weight: Optional[int] = None
     position: Optional[str] = None
+    # Visibility settings
+    showAge: Optional[bool] = True
+    showHeight: Optional[bool] = True
+    showWeight: Optional[bool] = True
+    showPosition: Optional[bool] = True
     
     class Config:
         json_encoders = {
