@@ -111,6 +111,13 @@ async def init_db(pool):
             );
         ''')
         
+        # Ensure albums table has the is_profile_album column
+        try:
+            await conn.execute('ALTER TABLE albums ADD COLUMN IF NOT EXISTS is_profile_album BOOLEAN DEFAULT FALSE;')
+            print("Successfully added is_profile_album column to albums table if it didn't exist.")
+        except Exception as e:
+            print(f"Error adding is_profile_album column to albums table: {str(e)}")
+        
         await conn.execute('''
             CREATE TABLE IF NOT EXISTS blocked_users (
                 blocker_id TEXT NOT NULL,
